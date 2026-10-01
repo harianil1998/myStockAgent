@@ -71,7 +71,7 @@ class Notifier:
             d = Path(self.cfg.report_dir)
             d.mkdir(parents=True, exist_ok=True)
             path = d / f"{at:%Y-%m-%d_%H%M}_{mode}.md"
-            path.write_text(md)
+            path.write_text(md, encoding="utf-8")
         if self.cfg.console:
             print(md)
         short = render_short(report, mode)

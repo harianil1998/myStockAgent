@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sys
 
 from .config import load_settings
 from .orchestrator import Orchestrator
@@ -21,6 +22,11 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("score", help="Print the raw signal leaderboard (no LLM)")
     sub.add_parser("sources", help="Run each sub-agent once and show its status")
     args = p.parse_args(argv)
+
+    # Windows consoles default to a legacy code page that can't print the report's emoji.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")

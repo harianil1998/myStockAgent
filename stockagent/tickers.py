@@ -43,18 +43,18 @@ class TickerUniverse:
         cache = data_dir / "company_tickers.json"
         raw = None
         if cache.exists() and time.time() - cache.stat().st_mtime < max_age_hours * 3600:
-            raw = json.loads(cache.read_text())
+            raw = json.loads(cache.read_text(encoding="utf-8"))
         else:
             try:
                 async with httpx.AsyncClient(timeout=20, headers={"User-Agent": user_agent}) as c:
                     r = await c.get(SEC_TICKERS_URL)
                     r.raise_for_status()
                     raw = r.json()
-                    cache.write_text(json.dumps(raw))
+                    cache.write_text(json.dumps(raw), encoding="utf-8")
             except Exception as e:  # network down, SEC throttling, ...
                 log.warning("Could not refresh SEC ticker list (%s); using cache if any", e)
                 if cache.exists():
-                    raw = json.loads(cache.read_text())
+                    raw = json.loads(cache.read_text(encoding="utf-8"))
         return cls.from_sec_json(raw or {})
 
     @classmethod

@@ -128,7 +128,7 @@ async def test_end_to_end_sweep_and_report(orch, tmp_path):
     assert await orch.sweep() == 0  # dedup on re-poll
     report = await orch.analyze("daily")
     assert report.recommendations[0].ticker == "NVDA"
-    md = next((tmp_path / "reports").glob("*_daily.md")).read_text()
+    md = next((tmp_path / "reports").glob("*_daily.md")).read_text(encoding="utf-8")
     assert "NVDA" in md and "Not financial advice" in md
 
 
