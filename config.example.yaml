@@ -1,0 +1,62 @@
+# Copy to config.yaml and edit. Secrets go in .env (see .env.example), never here.
+
+data_dir: data
+# Tickers you always want tracked (per-symbol StockTwits/Yahoo/X searches + market data)
+watchlist: [NVDA, AAPL, MSFT, TSLA, AMD, PLTR]
+
+analyst:
+  # auto        = API key if ANTHROPIC_API_KEY is set, else Claude Code (Pro/Max login), else rules
+  # api         = Anthropic API key (pay as you go)
+  # claude-code = the `claude` CLI, using your Claude Pro/Max subscription
+  # rules       = no LLM, rule-based recommendations only
+  backend: auto
+  model: claude-opus-5-5
+  effort: high          # low | medium | high | xhigh | max
+  max_candidates: 15    # top-N tickers sent to Claude each run
+
+schedule:
+  daily_digest_time: "08:30"
+  timezone: America/New_York
+  weekdays_only: true
+  rescore_seconds: 300        # realtime: re-score every 5 min
+  alert_score_threshold: 6.0  # |score| that triggers a realtime alert
+  alert_cooldown_hours: 6
+
+notify:
+  console: true
+  report_dir: reports
+  # Webhook URLs are read from these env vars:
+  discord_webhook_env: DISCORD_WEBHOOK_URL
+  slack_webhook_env: SLACK_WEBHOOK_URL
+
+# Every sub-agent can be toggled and tuned. Omitted keys keep their defaults.
+sources:
+  reddit:
+    interval_seconds: 180
+    options:
+      subreddits: [wallstreetbets, stocks, investing, options, StockMarket, pennystocks, Daytrading]
+  stocktwits:
+    interval_seconds: 120
+  twitter:            # needs X_BEARER_TOKEN
+    enabled: true
+    options:
+      accounts: []    # e.g. [unusual_whales, DeItaone, ...] - traders/analysts you trust
+  discord:            # needs DISCORD_BOT_TOKEN
+    options:
+      channel_ids: [] # channel IDs from servers your bot is in (right-click > Copy Channel ID)
+  news:
+    interval_seconds: 300
+  superinvestors:     # 13F filings of top funds (quarterly)
+    interval_seconds: 21600
+    options:
+      funds: {}       # {"Fund name": "CIK"} - empty uses the built-in list
+  ark:                # ARK Invest daily trades
+    interval_seconds: 3600
+  insiders:           # SEC Form 4, near-realtime
+    interval_seconds: 900
+    options:
+      min_value_usd: 100000
+  congress:           # needs QUIVER_API_KEY
+    enabled: true
+  market:             # price/volume anomalies
+    interval_seconds: 600

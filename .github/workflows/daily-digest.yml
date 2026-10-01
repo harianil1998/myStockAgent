@@ -1,0 +1,38 @@
+# Runs one sweep of every sub-agent each weekday morning and posts the digest
+# to your Discord/Slack webhook. Add secrets under Settings > Secrets > Actions.
+name: Daily stock digest
+
+on:
+  schedule:
+    - cron: "15 12 * * 1-5"   # 12:15 UTC = 08:15 New York (EDT)
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore signal history
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: stockagent-data-${{ github.run_id }}
+          restore-keys: stockagent-data-
+      - run: pip install .
+      - run: cp config.example.yaml config.yaml
+      - run: stockagent once
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          QUIVER_API_KEY: ${{ secrets.QUIVER_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest
+          path: reports/
