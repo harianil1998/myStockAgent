@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -17,10 +17,13 @@ class SourceConfig(BaseModel):
 
 
 class AnalystConfig(BaseModel):
+    # auto: API key if set, else Claude Code CLI (Pro/Max login) if installed, else rules.
+    backend: Literal["auto", "api", "claude-code", "rules"] = "auto"
     model: str = "claude-opus-5-5"
     effort: str = "high"
     max_candidates: int = 15
     enabled: bool = True
+    claude_code_timeout_seconds: int = 600
 
 
 class ScheduleConfig(BaseModel):

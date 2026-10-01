@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -69,9 +70,9 @@ async def test_claude_analyst_request_shape():
     report = AnalystReport(market_summary="s", red_flags=[], recommendations=[Recommendation(
         ticker="NVDA", action="BUY", conviction=8, time_horizon="swing", thesis="t",
         catalysts=[], risks=[], key_sources=["insider"])])
-    a = Analyst(AnalystConfig())
+    a = Analyst(AnalystConfig(backend="rules"))
     msgs = FakeMessages(SimpleNamespace(stop_reason="end_turn", parsed_output=report))
-    a.client = SimpleNamespace(beta=SimpleNamespace(messages=msgs))
+    a.backend, a.client = "api", SimpleNamespace(beta=SimpleNamespace(messages=msgs))
     out = await a.analyze(aggregate([sig("NVDA")], now=NOW))
     assert out.recommendations[0].ticker == "NVDA"
     kw = msgs.kwargs
@@ -81,11 +82,73 @@ async def test_claude_analyst_request_shape():
 
 
 async def test_claude_refusal_falls_back():
-    a = Analyst(AnalystConfig())
-    a.client = SimpleNamespace(beta=SimpleNamespace(messages=FakeMessages(
+    a = Analyst(AnalystConfig(backend="rules"))
+    a.backend, a.client = "api", SimpleNamespace(beta=SimpleNamespace(messages=FakeMessages(
         SimpleNamespace(stop_reason="refusal", parsed_output=None))))
     out = await a.analyze(aggregate([sig("NVDA")], now=NOW))
     assert out.market_summary.startswith("Rule-based")
+
+
+def test_backend_selection(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("ANTHROPIC_PROFILE", raising=False)
+    monkeypatch.setattr(analyst_mod.shutil, "which", lambda name: "/usr/bin/claude")
+    assert Analyst(AnalystConfig()).backend == "claude-code"
+    assert Analyst(AnalystConfig(backend="api")).backend == "rules"  # no key
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    assert Analyst(AnalystConfig()).backend == "api"  # key wins in auto
+    assert Analyst(AnalystConfig(backend="claude-code")).backend == "claude-code"
+    monkeypatch.setattr(analyst_mod.shutil, "which", lambda name: None)
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    assert Analyst(AnalystConfig()).backend == "rules"
+
+
+class FakeProc:
+    def __init__(self, out: bytes, returncode: int = 0):
+        self.out, self.returncode, self.stdin_data = out, returncode, None
+
+    async def communicate(self, data):
+        self.stdin_data = data
+        return self.out, b""
+
+    def kill(self):
+        pass
+
+
+async def test_claude_code_backend(monkeypatch):
+    report = {"market_summary": "s", "red_flags": [], "recommendations": [{
+        "ticker": "NVDA", "action": "WATCH", "conviction": 5, "time_horizon": "swing", "thesis": "t",
+        "catalysts": [], "risks": [], "key_sources": ["social"]}]}
+    proc = FakeProc(json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                                "result": "", "structured_output": report}).encode())
+    calls = {}
+
+    async def fake_exec(*cmd, **kw):
+        calls["cmd"], calls["env"] = cmd, kw["env"]
+        return proc
+    monkeypatch.setattr(analyst_mod.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-should-not-leak")
+    a = Analyst(AnalystConfig(backend="rules"))
+    a.backend, a.claude_cli = "claude-code", "claude"
+    out = await a.analyze(aggregate([sig("NVDA")], now=NOW))
+    assert out.recommendations[0].action == "WATCH"
+    cmd = calls["cmd"]
+    assert cmd[:2] == ("claude", "-p") and cmd[cmd.index("--tools") + 1] == ""
+    assert cmd[cmd.index("--model") + 1] == "claude-opus-5-5"
+    assert "ANTHROPIC_API_KEY" not in calls["env"]  # uses the subscription login, not the key
+    assert b'"ticker": "NVDA"' in proc.stdin_data
+
+
+def test_claude_code_output_errors():
+    with pytest.raises(analyst_mod.ClaudeCodeError, match="not logged in"):
+        analyst_mod.parse_claude_code_output(1, b"", b"not logged in")
+    err = json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True, "result": "x"}).encode()
+    with pytest.raises(analyst_mod.ClaudeCodeError):
+        analyst_mod.parse_claude_code_output(0, err, b"")
+    bad = json.dumps({"subtype": "success", "is_error": False, "structured_output": {"nope": 1}}).encode()
+    with pytest.raises(analyst_mod.ClaudeCodeError, match="schema"):
+        analyst_mod.parse_claude_code_output(0, bad, b"")
 
 
 class FakeAgent(SourceAgent):
@@ -102,7 +165,7 @@ class FakeAgent(SourceAgent):
 @pytest.fixture
 def orch(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    settings = Settings(data_dir=str(tmp_path / "data"),
+    settings = Settings(data_dir=str(tmp_path / "data"), analyst={"backend": "rules"},
                         notify={"console": False, "report_dir": str(tmp_path / "reports")},
                         sources={n: {"enabled": False} for n in
                                  ["reddit", "stocktwits", "twitter", "discord", "news", "superinvestors",

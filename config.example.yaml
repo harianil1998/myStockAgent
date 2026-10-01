@@ -5,6 +5,11 @@ data_dir: data
 watchlist: [NVDA, AAPL, MSFT, TSLA, AMD, PLTR]
 
 analyst:
+  # auto        = API key if ANTHROPIC_API_KEY is set, else Claude Code (Pro/Max login), else rules
+  # api         = Anthropic API key (pay as you go)
+  # claude-code = the `claude` CLI, using your Claude Pro/Max subscription
+  # rules       = no LLM, rule-based recommendations only
+  backend: auto
   model: claude-opus-5-5
   effort: high          # low | medium | high | xhigh | max
   max_candidates: 15    # top-N tickers sent to Claude each run

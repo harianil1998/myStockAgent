@@ -70,7 +70,7 @@ own 7-day baseline. A positive score is bullish and a negative one is bearish.
 
 ```bash
 pip install -e ".[dev]"
-cp .env.example .env                 # add ANTHROPIC_API_KEY and SEC_USER_AGENT at minimum
+cp .env.example .env                 # add SEC_USER_AGENT (+ ANTHROPIC_API_KEY unless using Claude Code)
 cp config.example.yaml config.yaml   # set your watchlist, Discord channels, X accounts
 
 stockagent sources   # run every sub-agent once and show its status
@@ -83,8 +83,19 @@ stockagent run       # realtime daemon: continuous polling, alerts, daily digest
 Reports are saved to `reports/YYYY-MM-DD_HHMM_{daily|realtime}.md`. Set `DISCORD_WEBHOOK_URL` or
 `SLACK_WEBHOOK_URL` to have them posted to a channel as well.
 
-Without `ANTHROPIC_API_KEY` the agent still runs, using a transparent rule-based analyst instead
-of Claude.
+### Connecting Claude: subscription or API key
+
+The analyst can reach Claude in either of two ways (`analyst.backend` in `config.yaml`):
+
+- **Claude Pro/Max subscription (`claude-code`):** install [Claude Code](https://claude.com/claude-code)
+  and run `claude` once to sign in. The agent then runs `claude -p` for each report, and the
+  usage counts against your plan's limits. No API key is needed.
+- **API key (`api`):** create a key at platform.claude.com and set `ANTHROPIC_API_KEY` in `.env`.
+  You pay per use.
+
+With the default, `auto`, the agent uses the API key if one is set, otherwise Claude Code if the
+`claude` command is installed. If neither is available, it falls back to a transparent rule-based
+analyst.
 
 ### Running it every day
 
