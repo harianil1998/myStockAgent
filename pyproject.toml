@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stockagent"
+version = "0.1.0"
+description = "Multi-source stock research agent: social, smart-money and news sub-agents feeding a Claude analyst."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=1.0",
+    "httpx>=0.27",
+    "feedparser>=6.0",
+    "pydantic>=2.5",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+stockagent = "stockagent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["stockagent*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
