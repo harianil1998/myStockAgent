@@ -14,6 +14,7 @@ dependencies = [
     "feedparser>=6.0",
     "pydantic>=2.5",
     "PyYAML>=6.0",
+    "tzdata; sys_platform == 'win32'",  # Windows has no system time zone database
 ]
 
 [project.optional-dependencies]
